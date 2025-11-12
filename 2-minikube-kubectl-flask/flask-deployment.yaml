@@ -1,0 +1,49 @@
+# -----------------------------------------
+# Deployment: Defines how to run and manage the Flask app pods
+# -----------------------------------------
+apiVersion: apps/v1                     # API version used for the Deployment resource (stable version for workloads)
+kind: Deployment                        # Kind specifies this resource is a Deployment
+metadata:
+  name: flask-app                       # Name of the Deployment; must be unique in the namespace
+spec:
+  replicas: 1                           # Desired number of running pods; ensures at least 1 is always active
+  selector:                             # Defines how Kubernetes identifies which pods belong to this Deployment
+    matchLabels:                        # Label selector to match pods with the same key-value pair
+      app: flask-app                    # Label used to connect Deployment with its pods
+  template:                             # Pod template that describes how the Pods should be created
+    metadata:
+      labels:
+        app: flask-app                  # Label assigned to each Pod; must match the selector above
+    spec:
+      containers:                       # List of containers inside each Pod
+      - name: flask-app                 # Container name (used for referencing or debugging)
+        image: flask-app:latest         # Docker image to use for the container; locally built in Minikube
+        imagePullPolicy: IfNotPresent   # Use local image if available; pull from registry only if missing
+        ports:
+        - containerPort: 15000          # Exposed port inside the container where Flask listens (matches app.py)
+
+# -----------------------------------------
+# Service: Provides stable networking and external access to the pods
+# -----------------------------------------
+---
+apiVersion: v1                          # API version for core Kubernetes objects (Service is part of core/v1)
+kind: Service                           # Kind specifies this resource is a Service
+metadata:
+  name: flask-app-service               # Unique name for the Service within the namespace
+spec:
+  selector:                             # Determines which pods this Service routes traffic to
+    app: flask-app                      # Must match the label defined in the Pod template (links Service -> Pods)
+  ports:                                # List of ports to expose for the Service
+  - name: http                          # Optional name for the port (used for clarity or referencing)
+    port: 15000                         # Port exposed by the Service inside the cluster
+    targetPort: 15000                   # Port on the Pod/container that receives the traffic (Flask listening port)
+  type: NodePort                        # Exposes the Service externally via a Node port (typically 30000–32767)
+
+# -----------------------------------------
+# Explanation Summary:
+# 1. The Deployment ensures one Pod (replica) runs the flask-app container.
+# 2. The Pod listens on port 15000 internally (containerPort).
+# 3. The Service (flask-app-service) exposes the application on the same port (15000),
+#    forwarding traffic from the Node’s external port (random high NodePort) to the container port.
+# 4. Use "minikube service flask-app-service --url" to get the accessible external URL.
+# -----------------------------------------

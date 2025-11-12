@@ -1,0 +1,73 @@
+# -----------------------------------------
+# ReplicaSet: Ensures a specified number of identical Pods are always running
+# -----------------------------------------
+apiVersion: apps/v1                     # API version for workload resources (Deployments, ReplicaSets, etc.)
+kind: ReplicaSet                        # Defines this resource as a ReplicaSet (controls the number of identical pods)
+metadata:
+  name: flashsale-rs                    # Unique name of the ReplicaSet
+  labels:
+    app: flashsale                      # Label used for organization and selection
+spec:
+  replicas: 3                           # Desired number of Pod replicas; Kubernetes will maintain exactly 3 Pods
+  selector:                             # Defines how the ReplicaSet finds Pods it manages
+    matchLabels:                        # Pods with matching labels are controlled by this ReplicaSet
+      app: flashsale                    # Matches Pods labeled with "app: flashsale"
+  template:                             # Pod template used to create new Pods when needed
+    metadata:
+      labels:
+        app: flashsale                  # Label applied to each created Pod; must match selector for proper association
+    spec:
+      containers:                       # List of containers to run in each Pod
+      - name: flashsale-container       # Name of the container (used in logs, probes, etc.)
+        image: flashsale:1.0            # Docker image to run; built locally or pulled from a registry
+        ports:
+        - containerPort: 5000           # Port where the Flask app listens inside the container
+        readinessProbe:                 # Check if the container is ready to serve traffic
+          httpGet:
+            path: /health               # Endpoint used to test readiness
+            port: 5000                  # Port for the readiness check (matches Flask's /health route)
+          initialDelaySeconds: 3        # Delay before first readiness probe runs after container starts
+          periodSeconds: 5              # Frequency (in seconds) between readiness checks
+        livenessProbe:                  # Check if the container is still healthy (to restart if it hangs)
+          httpGet:
+            path: /health               # Endpoint used to test liveness
+            port: 5000                  # Same health-check endpoint
+          initialDelaySeconds: 10       # Delay before first liveness probe runs
+          periodSeconds: 10             # Frequency of liveness checks
+        resources:                      # Resource requests and limits for CPU and memory
+          requests:                     # Minimum resources Kubernetes guarantees for each container
+            cpu: "100m"                 # 100 millicores = 0.1 CPU core reserved
+            memory: "128Mi"             # 128 MiB of memory requested
+          limits:                       # Maximum resources container can use before throttling
+            cpu: "500m"                 # Limit to half a CPU core
+            memory: "256Mi"             # Limit to 256 MiB of memory
+
+# -----------------------------------------
+# Service: Provides stable networking and external access for the ReplicaSet pods
+# -----------------------------------------
+---
+apiVersion: v1                          # API version for core Kubernetes objects (Service belongs here)
+kind: Service                           # Defines this resource as a Service
+metadata:
+  name: flashsale-svc                   # Name of the Service
+spec:
+  selector:                             # Connects this Service to Pods with the same label
+    app: flashsale                      # Routes traffic to Pods labeled with "app: flashsale"
+  ports:                                # List of port mappings for the Service
+  - name: http                          # Descriptive name for the port mapping
+    port: 80                            # Service port exposed inside the cluster (logical port for clients)
+    targetPort: 5000                    # Port on the Pod/container receiving the traffic (Flask listens here)
+  type: NodePort                        # Exposes the Service externally via a Node's IP and high port (30000–32767)
+
+# -----------------------------------------
+# Explanation Summary:
+# 1. The ReplicaSet (flashsale-rs) ensures there are always 3 Pods running the same Flask app.
+# 2. If a Pod fails or is deleted, ReplicaSet automatically creates a replacement.
+# 3. Each Pod runs the Flask container on port 5000.
+# 4. Readiness and liveness probes call /health to ensure the app is functioning.
+# 5. CPU/memory requests & limits help schedule Pods efficiently and prevent resource overuse.
+# 6. The Service (flashsale-svc) exposes these Pods internally on port 80
+#    and externally through a NodePort for browser access.
+# 7. Access externally using:
+#      minikube service flashsale-svc --url
+# -----------------------------------------
