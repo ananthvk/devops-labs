@@ -274,27 +274,12 @@ pipeline {
     agent any
 
     stages {
+
         stage('Pre-check Docker') {
             steps {
                 script {
-                    def v = sh(script: 'docker --version', returnStdout: true).trim()
-                    if (!v) { error "Docker missing" }
-                    if (sh(script: 'docker info', returnStatus: true) != 0) {
-                        error "Docker daemon not running"
-                    }
-                }
-            }
-        }
-
-        stage('Setup Workspace') {
-            steps {
-                script {
-                    def localSourcePath = env.WORKSPACE
-                    sh """
-                    cp ${localSourcePath}/delivery_metrics.py ${WORKSPACE}/
-                    cp ${localSourcePath}/prometheus.yml ${WORKSPACE}/
-                    cp ${localSourcePath}/alert_rules.yml ${WORKSPACE}/
-                    """
+                    sh 'docker --version'
+                    sh 'docker info'
                 }
             }
         }
@@ -307,13 +292,19 @@ pipeline {
 
         stage('Run Application') {
             steps {
-                sh 'docker run -d -p 8000:8000 --name delivery_metrics delivery_metrics'
+                sh '''
+                docker rm -f delivery_metrics || true
+                docker run -d -p 8000:8000 --name delivery_metrics delivery_metrics
+                '''
             }
         }
 
         stage('Run Prometheus & Grafana') {
             steps {
                 sh '''
+                docker rm -f prometheus || true
+                docker rm -f grafana || true
+
                 docker run -d --name prometheus -p 9090:9090 \
                   -v $WORKSPACE/prometheus.yml:/etc/prometheus/prometheus.yml \
                   -v $WORKSPACE/alert_rules.yml:/etc/prometheus/alert_rules.yml \

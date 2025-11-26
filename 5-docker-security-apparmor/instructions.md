@@ -91,6 +91,56 @@ File Name: `/etc/apparmor.d/my-apparmor-profile`
     deny capability sys_admin,
 }
 ```
+```
+#include <tunables/global>
+
+/usr/bin/python3 {
+    deny /etc/** r,
+    deny /var/** rw,
+
+    network inet stream,
+
+    /app/** rwk,
+
+    deny /bin/** x,
+    deny /usr/bin/** x,
+
+    capability net_bind_service,
+    deny capability sys_admin,
+}
+```
+
+```
+#include <tunables/global>
+
+profile my-apparmor-profile flags=(attach_disconnected) {
+
+    # ------------------------------------
+    # FILE ACCESS RESTRICTIONS
+    # ------------------------------------
+    deny /etc/** r,
+    deny /var/** rw,
+
+    /app/** rwk,
+
+    # ------------------------------------
+    # PROGRAM EXECUTION RESTRICTIONS
+    # ------------------------------------
+    deny /bin/** x,
+    deny /usr/bin/** x,
+
+    # ------------------------------------
+    # NETWORK RULES
+    # ------------------------------------
+    network inet stream,
+
+    # ------------------------------------
+    # CAPABILITIES
+    # ------------------------------------
+    capability net_bind_service,
+    deny capability sys_admin,
+}
+```
 
 Explanation of major directives:
 
