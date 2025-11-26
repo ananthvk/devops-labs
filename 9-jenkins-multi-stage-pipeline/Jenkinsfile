@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_DIR = "9-jenkins-multi-stage-pipeline"
+    }
+
+    stages {
+
+        stage('Build') {
+            steps {
+                sh '''
+                cd $APP_DIR
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh '''
+                cd $APP_DIR
+                . venv/bin/activate
+                python3 -m unittest discover -s .
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                mkdir -p $WORKSPACE/python-app-deploy
+                cp $APP_DIR/app.py $WORKSPACE/python-app-deploy/
+                cp -r $APP_DIR/venv $WORKSPACE/python-app-deploy/
+                '''
+            }
+        }
+
+        stage('Run Application') {
+            steps {
+                sh '''
+                cd $WORKSPACE/python-app-deploy
+                . venv/bin/activate
+                nohup python3 app.py > app.log 2>&1 &
+                echo $! > app.pid
+                '''
+            }
+        }
+
+        stage('Test Application') {
+            steps {
+                sh '''
+                cd $APP_DIR
+                . venv/bin/activate
+                python3 test_app.py
+                '''
+            }
+        }
+    }
+}
